@@ -1,3 +1,10 @@
+# Generates a CSV of all subnets within an AWS Organization.
+# To be run from the Organization management account.
+
+# Usage:
+# pip install boto3 botocove
+# python get_subnets.py
+
 import boto3
 from botocove import cove
 import csv
