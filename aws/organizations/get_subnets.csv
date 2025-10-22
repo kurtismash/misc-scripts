@@ -5,7 +5,7 @@ import ipaddress
 
 @cove(
 #   target_ids=[],
-#   ignore_ids=[]
+#   ignore_ids=[],
     regions = [r['RegionName'] for r in boto3.client('ec2').describe_regions()['Regions']],
 )
 def describe_subnets(session):
