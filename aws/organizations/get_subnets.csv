@@ -1,0 +1,42 @@
+import boto3
+from botocove import cove
+import csv
+import ipaddress
+
+@cove(
+#   target_ids=[],
+#   ignore_ids=[]
+    regions = [r['RegionName'] for r in boto3.client('ec2').describe_regions()['Regions']],
+)
+def describe_subnets(session):
+    client = session.client("ec2")
+    subnets = client.describe_subnets()["Subnets"]
+    # Get VPC endpoint network interfaces for all subnets with pagination
+    endpoint_counts = {}
+    paginator = client.get_paginator('describe_network_interfaces')
+    for page in paginator.paginate(Filters=[{'Name': 'interface-type', 'Values': ['vpc_endpoint']}]):
+        for eni in page['NetworkInterfaces']:
+            subnet_id = eni['SubnetId']
+            endpoint_counts[subnet_id] = endpoint_counts.get(subnet_id, 0) + 1
+    # Add VPC endpoint count to each subnet
+    for subnet in subnets:
+        subnet['VpcEndpointNetworkInterfaceCount'] = endpoint_counts.get(subnet['SubnetId'], 0)
+    return subnets
+
+def main():
+    result = describe_subnets()
+    subnets = []
+    for i in result['Results']:
+        for j in i['Result']:
+            totalAddresses = ipaddress.IPv4Network(j['CidrBlock'], strict=False).num_addresses - 5
+            j['TotalIpAddressCount'] = totalAddresses
+            j['UsedIpAddressCount'] = totalAddresses - j['AvailableIpAddressCount']
+            subnets.append(j)
+    with open('subnets.csv', 'w') as fout:
+        headers = [ 'AvailabilityZoneId', 'EnableLniAtDeviceIndex', 'MapCustomerOwnedIpOnLaunch', 'CustomerOwnedIpv4Pool', 'OwnerId', 'AssignIpv6AddressOnCreation', 'Ipv6CidrBlockAssociationSet', 'Tags', 'SubnetArn', 'OutpostArn', 'EnableDns64', 'Ipv6Native', 'PrivateDnsNameOptionsOnLaunch', 'BlockPublicAccessStates', 'Type', 'SubnetId', 'State', 'VpcId', 'CidrBlock', 'TotalIpAddressCount', 'AvailableIpAddressCount', 'UsedIpAddressCount', 'VpcEndpointNetworkInterfaceCount', 'AvailabilityZone', 'DefaultForAz', 'MapPublicIpOnLaunch']
+        w = csv.DictWriter(fout, fieldnames=headers)
+        w.writeheader()
+        [w.writerow(s) for s in subnets]
+
+if __name__ == '__main__':
+    main()
