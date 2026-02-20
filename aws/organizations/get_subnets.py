@@ -18,6 +18,7 @@ import ipaddress
 def describe_subnets(session):
     client = session.client("ec2")
     subnets = client.describe_subnets()["Subnets"]
+    vpcs = {v['VpcId']: v for v in client.describe_vpcs()['Vpcs']}
     # Get VPC endpoint network interfaces for all subnets with pagination
     endpoint_counts = {}
     paginator = client.get_paginator('describe_network_interfaces')
@@ -28,6 +29,7 @@ def describe_subnets(session):
     # Add VPC endpoint count to each subnet
     for subnet in subnets:
         subnet['VpcEndpointNetworkInterfaceCount'] = endpoint_counts.get(subnet['SubnetId'], 0)
+        subnet['DefaultVpc'] = vpcs[subnet['VpcId']]['IsDefault']
     return subnets
 
 def main():
@@ -40,7 +42,7 @@ def main():
             j['UsedIpAddressCount'] = totalAddresses - j['AvailableIpAddressCount']
             subnets.append(j)
     with open('subnets.csv', 'w') as fout:
-        headers = [ 'AvailabilityZoneId', 'EnableLniAtDeviceIndex', 'MapCustomerOwnedIpOnLaunch', 'CustomerOwnedIpv4Pool', 'OwnerId', 'AssignIpv6AddressOnCreation', 'Ipv6CidrBlockAssociationSet', 'Tags', 'SubnetArn', 'OutpostArn', 'EnableDns64', 'Ipv6Native', 'PrivateDnsNameOptionsOnLaunch', 'BlockPublicAccessStates', 'Type', 'SubnetId', 'State', 'VpcId', 'CidrBlock', 'TotalIpAddressCount', 'AvailableIpAddressCount', 'UsedIpAddressCount', 'VpcEndpointNetworkInterfaceCount', 'AvailabilityZone', 'DefaultForAz', 'MapPublicIpOnLaunch']
+        headers = [ 'AvailabilityZoneId', 'EnableLniAtDeviceIndex', 'MapCustomerOwnedIpOnLaunch', 'CustomerOwnedIpv4Pool', 'OwnerId', 'AssignIpv6AddressOnCreation', 'Ipv6CidrBlockAssociationSet', 'Tags', 'SubnetArn', 'OutpostArn', 'EnableDns64', 'Ipv6Native', 'PrivateDnsNameOptionsOnLaunch', 'BlockPublicAccessStates', 'Type', 'SubnetId', 'State', 'VpcId', 'CidrBlock', 'TotalIpAddressCount', 'AvailableIpAddressCount', 'UsedIpAddressCount', 'VpcEndpointNetworkInterfaceCount', 'AvailabilityZone', 'DefaultForAz', 'MapPublicIpOnLaunch', "DefaultVpc"]
         w = csv.DictWriter(fout, fieldnames=headers)
         w.writeheader()
         [w.writerow(s) for s in subnets]
